@@ -602,7 +602,14 @@ void CsvParser::parse_line(const std::string& line, std::vector<std::string>& fi
             }
         } else {
             if (c == '"') {
-                in_quotes = true;
+                if (!field.empty()) {
+                    if (config_.mode == "strict") {
+                        throw std::runtime_error("CsvReadError: Malformed CSV: unescaped quote in mid-field");
+                    }
+                    field += c;
+                } else {
+                    in_quotes = true;
+                }
             } else if (c == config_.delimiter) {
                 add_field(field);
                 field.clear();

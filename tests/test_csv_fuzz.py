@@ -26,10 +26,34 @@ def test_malformed_mid_field_quotes(tmp_path):
     csv_path = tmp_path / "test.csv"
     csv_path.write_text('id,text\n1,hel"lo\n2,ok')
 
-    try:
-        ar.read_csv(csv_path)
-    except ar.CsvReadError:
-        pass  # If it rejects, that's fine too
+    # In default mode, the quote should be preserved.
+    frame = ar.read_csv(csv_path)
+    df = ar.to_pandas(frame)
+    assert df.loc[0, "text"] == 'hel"lo'
+
+    # In strict mode, it should raise
+    with pytest.raises(ar.CsvReadError):
+        ar.read_csv(csv_path, mode="strict")
+
+def test_regression_mid_field_quotes_scenarios(tmp_path):
+    """Test specific mid-field quote preservation cases."""
+    csv_path = tmp_path / "test.csv"
+    
+    # Cases: ab"cd", "ab"cd, and properly escaped "ab""cd"
+    content = 'id,text\n1,ab"cd"\n2,"ab"cd\n3,"ab""cd"\n'
+    csv_path.write_text(content)
+    
+    frame = ar.read_csv(csv_path)
+    df = ar.to_pandas(frame)
+    
+    # ab"cd" is treated as unquoted, so the quote is just preserved
+    assert df.loc[0, "text"] == 'ab"cd"'
+    
+    # "ab"cd starts with a quote, so "ab" is quoted, then cd is just appended
+    assert df.loc[1, "text"] == 'abcd'
+    
+    # "ab""cd" is a properly escaped quoted string
+    assert df.loc[2, "text"] == 'ab"cd'
 
 
 def test_malformed_double_quotes_inside_field(tmp_path):
